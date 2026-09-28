@@ -14,9 +14,9 @@
     ymax = 1
     zmin = 0
     zmax = 1
-    nx = 20
-    ny = 4
-    nz = 4
+    nx = 200
+    ny = 40
+    nz = 40
     elem_type = HEX8
   []
 []
@@ -38,7 +38,7 @@
 
 [Kernels]
   [htcond] #Heat conduction equation
-    type = HeatConduction
+    type = ADHeatConduction
     variable = T
     use_displaced_mesh = true
   []
@@ -50,10 +50,11 @@
 [Physics/SolidMechanics/QuasiStatic]
   displacements = 'disp_x disp_y disp_z'
   [block]
-    strain = FINITE
+    strain = SMALL
     displacements = 'disp_x disp_y disp_z'
     eigenstrain_names = 'thermal_expansion'
     temperature = T
+    use_automatic_differentiation = true
   []
 []
 
@@ -67,25 +68,25 @@
 
 [BCs]
   [all_T] #Temperature on outer edge is fixed at 800K
-    type = FunctionDirichletBC
+    type = ADFunctionDirichletBC
     variable = T
     boundary = 'front back top bottom left right'
     function = temperature_ramp
   []
   [fix_disp_x] #Displacements in the x-direction are fixed in the center
-    type = DirichletBC
+    type = ADDirichletBC
     variable = disp_x
     boundary = left
     value = 0
   []
   [fix_disp_y] #Displacements in the y-direction are fixed in the center
-    type = DirichletBC
+    type = ADDirichletBC
     variable = disp_y
     boundary = 'front back top bottom left right'
     value = 0
   []
   [fix_disp_z] #Displacements in the y-direction are fixed in the center
-    type = DirichletBC
+    type = ADDirichletBC
     variable = disp_z
     boundary = 'front back top bottom left right'
     value = 0
@@ -94,20 +95,20 @@
 
 [Materials]
   [thcond] #Thermal conductivity is set to 5 W/mK
-    type = GenericConstantMaterial
+    type = ADGenericConstantMaterial
     prop_names = 'thermal_conductivity'
     prop_values = 1
   []
   [elasticity_tensor] #Sets isotropic elastic constants
-    type = ComputeIsotropicElasticityTensor
+    type = ADComputeIsotropicElasticityTensor
     youngs_modulus = 1e6
     poissons_ratio = 0.3
   []
   [stress] #We use linear elasticity
-    type = ComputeFiniteStrainElasticStress
+    type = ADComputeLinearElasticStress
   []
   [thermal_strain]
-    type= ComputeThermalExpansionEigenstrain
+    type= ADComputeThermalExpansionEigenstrain
     thermal_expansion_coeff = 1e-5
     temperature = T
     stress_free_temperature = 100
@@ -118,15 +119,14 @@
 [Executioner]
   type = Transient
   num_steps = 1
-  solve_type = PJFNK
+  solve_type = NEWTON
 
   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart'
   petsc_options_value = 'hypre boomeramg 101'
   l_max_its = 30
   nl_max_its = 10
-  nl_rel_tol = 1e-12
-  l_tol = 1e-05
-
+  nl_rel_tol = 1e-08
+  l_tol = 1e-12
 []
 
 [Outputs]

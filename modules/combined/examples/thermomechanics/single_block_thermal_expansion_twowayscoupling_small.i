@@ -1,10 +1,10 @@
-# This example aims to replicate the test cas "Single-block thermomechanics example" 
+# This example aims to replicate the test cas "Single-block thermomechanics example" with two ways coupling
 # of the paper 'Evaluation of coupling approaches for thermomechanical simulations'
 # S.R. Novascone∗, B.W. Spencer, J.D. Hales, R.L. Williamson
 # NED 2015
 
 [Mesh]
-  #rectangular block
+  # rectangular block
   [block]
     type = GeneratedMeshGenerator
     dim = 3 
@@ -18,14 +18,16 @@
     ny = 4
     nz = 4
     elem_type = HEX8
-  []
+    []
+  displacements = 'disp_x disp_y disp_z'
+  # type = FileMesh
+  # file = single_block_mesh_refined.e
 []
 
 [Variables]
   # We solve for the temperature and the displacements
   [T]
     initial_condition = 100
-    # scaling = 1e7
   []
   [disp_x]
   []
@@ -50,7 +52,7 @@
 [Physics/SolidMechanics/QuasiStatic]
   displacements = 'disp_x disp_y disp_z'
   [block]
-    strain = FINITE
+    strain = SMALL
     displacements = 'disp_x disp_y disp_z'
     eigenstrain_names = 'thermal_expansion'
     temperature = T
@@ -66,25 +68,31 @@
 []
 
 [BCs]
-  [all_T] #Temperature on outer edge is fixed at 800K
+  [fix_temp_right] #Temperature on the right boundary is fixed to 100 K
+    type = DirichletBC
+    variable = T
+    boundary = right
+    value = 100
+  []
+  [ramp_temp_left] #Temperature on the left boundary is fixed to 1100 K
     type = FunctionDirichletBC
     variable = T
-    boundary = 'front back top bottom left right'
+    boundary = left 
     function = temperature_ramp
   []
-  [fix_disp_x] #Displacements in the x-direction are fixed in the center
+  [fix_disp_x] #Displacements in the x-direction are fixed at the left
     type = DirichletBC
     variable = disp_x
     boundary = left
     value = 0
   []
-  [fix_disp_y] #Displacements in the y-direction are fixed in the center
+  [fix_disp_y] #Displacements in the y-direction are fixed on all the boundary (axial displavcement only)
     type = DirichletBC
     variable = disp_y
     boundary = 'front back top bottom left right'
     value = 0
   []
-  [fix_disp_z] #Displacements in the y-direction are fixed in the center
+  [fix_disp_z] #Displacements in the z-direction are fixed on all the boundary (axial displavcement only)
     type = DirichletBC
     variable = disp_z
     boundary = 'front back top bottom left right'
@@ -93,7 +101,7 @@
 []
 
 [Materials]
-  [thcond] #Thermal conductivity is set to 5 W/mK
+  [thcond] #Thermal conductivity is set to 1 W/mK
     type = GenericConstantMaterial
     prop_names = 'thermal_conductivity'
     prop_values = 1
@@ -104,7 +112,7 @@
     poissons_ratio = 0.3
   []
   [stress] #We use linear elasticity
-    type = ComputeFiniteStrainElasticStress
+    type = ComputeLinearElasticStress
   []
   [thermal_strain]
     type= ComputeThermalExpansionEigenstrain
@@ -115,18 +123,44 @@
   []
 []
 
+# [Preconditioning]
+#   [smp]
+#     type = SMP
+#     full = true
+#   []
+# []
+
 [Executioner]
   type = Transient
-  num_steps = 1
-  solve_type = PJFNK
+  num_steps = 1  
+  abort_on_solve_fail = true
+  solve_type = NEWTON
+  #  automatic_scaling =true
+  #  scaling_group_variables ='disp_x disp_y disp_z'
+  #  off_diagonals_in_auto_scaling= true
+  # resid_vs_jac_scaling_param=1
+  # line_search= none
+  verbose=true
 
-  petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart'
-  petsc_options_value = 'hypre boomeramg 101'
+   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart'
+   petsc_options_value = 'hypre boomeramg 101'
+   ### for Newton without preconditioning
+  # petsc_options_iname = '-pc_type  -ksp_gmres_restart'
+  # petsc_options_value = 'none  101'
+   ### for tuning e_rel
+  # petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart -mat_mffd_err'
+  # petsc_options_value = 'hypre boomeramg 101 1'
+
+  # for conditioning analysis (with Newton solve)
+  # petsc_options = '-pc_svd_monitor'
+  # petsc_options_iname = '-pc_type'
+  # petsc_options_value = 'svd'
+
   l_max_its = 30
   nl_max_its = 10
-  nl_rel_tol = 1e-12
-  l_tol = 1e-05
-
+  nl_rel_tol = 1e-08
+  l_abs_tol = 1e-15
+  l_tol = 1e-12
 []
 
 [Outputs]

@@ -19,6 +19,7 @@
     nz = 4
     elem_type = HEX8
   []
+  displacements = 'disp_x disp_y disp_z'
 []
 
 [Variables]
@@ -66,10 +67,16 @@
 []
 
 [BCs]
-  [all_T] #Temperature on outer edge is fixed at 800K
+  [fix_temp_right] #Temperature on the right boundary is fixed to 100 K
+    type = DirichletBC
+    variable = T
+    boundary = right
+    value = 100
+  []
+  [ramp_temp_left] #Temperature on the left boundary is fixed to 1100 K
     type = FunctionDirichletBC
     variable = T
-    boundary = 'front back top bottom left right'
+    boundary = left 
     function = temperature_ramp
   []
   [fix_disp_x] #Displacements in the x-direction are fixed in the center
@@ -124,8 +131,9 @@
   petsc_options_value = 'hypre boomeramg 101'
   l_max_its = 30
   nl_max_its = 10
-  nl_rel_tol = 1e-12
-  l_tol = 1e-05
+  nl_rel_tol = 1e-8
+  l_tol = 1e-5
+  l_abs_tol = 1e-15
 
 []
 
