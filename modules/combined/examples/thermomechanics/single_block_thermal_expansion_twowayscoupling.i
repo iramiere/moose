@@ -115,6 +115,7 @@
   []
   [thermal_strain]
     type= ComputeThermalExpansionEigenstrain
+    # thermal_expansion_coeff = 1e-5
     thermal_expansion_coeff = 1e-5
     temperature = T
     stress_free_temperature = 100
