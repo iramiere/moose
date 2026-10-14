@@ -58,7 +58,7 @@ Coupleable::Coupleable(const MooseObject * moose_object, bool nodal, bool is_fv)
     _coupleable_max_qps(Moose::constMaxQpsPerElem),
     _is_fv(is_fv),
     _obj(moose_object),
-    _writable_coupled_variables(libMesh::n_threads())
+    _writable_coupled_variables(_c_fe_problem.numThreads())
 {
   SubProblem & problem = *_c_parameters.getCheckedPointerParam<SubProblem *>("_subproblem");
   _obj->getMooseApp().registerInterfaceObject(*this);
@@ -2238,7 +2238,7 @@ Coupleable::adCoupledGradient(const std::string & var_name, unsigned int comp) c
     mooseError("Not implemented");
 
   if (!_coupleable_neighbor)
-    return var->adGradSln();
+    return usesFaceCoupledValues() ? var->adGradSlnFace() : var->adGradSln();
   return var->adGradSlnNeighbor();
 }
 
@@ -2253,6 +2253,8 @@ Coupleable::adCoupledGradientDot(const std::string & var_name, unsigned int comp
 
   if (!_c_is_implicit)
     mooseError("Not implemented");
+  mooseAssert(!usesFaceCoupledValues(),
+              "The AD gradient time derivative is not computed on element faces");
 
   if (!_coupleable_neighbor)
     return var->adGradSlnDot();
@@ -2370,7 +2372,7 @@ Coupleable::adCoupledVectorGradient(const std::string & var_name, unsigned int c
     mooseError("Not implemented");
 
   if (!_coupleable_neighbor)
-    return var->adGradSln();
+    return usesFaceCoupledValues() ? var->adGradSlnFace() : var->adGradSln();
   return var->adGradSlnNeighbor();
 }
 

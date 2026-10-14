@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,8 @@
 
 #include "libmesh/system.h"
 #include "libmesh/int_range.h"
+
+#include "timpi/parallel_sync.h"
 
 #include <algorithm>
 
@@ -44,6 +46,7 @@ System::setupVariables()
   auto & sys = _system.system();
 
   _var_subdomain_active.create(_num_vars, kokkosMesh().getNumSubdomains());
+  _var_scaling_factor.create(_num_vars);
 
   for (unsigned int var = 0; var < _num_vars; ++var)
     for (auto subdomain : _mesh.meshSubdomains())
@@ -51,6 +54,22 @@ System::setupVariables()
           sys.variable(var).active_on_subdomain(subdomain);
 
   _var_subdomain_active.copyToDevice();
+  updateVariableScalingFactors();
+}
+
+void
+System::updateVariableScalingFactors()
+{
+  auto & sys = _system.system();
+  for (const auto var : make_range(_num_vars))
+  {
+    const auto & moose_var =
+        sys.variable_type(var).family == libMesh::FEFamily::SCALAR
+            ? static_cast<const MooseVariableBase &>(_system.getScalarVariable(0, var))
+            : static_cast<const MooseVariableBase &>(_system.getVariable(0, var));
+    _var_scaling_factor[var] = moose_var.arrayScalingFactor()[var - moose_var.number()];
+  }
+  _var_scaling_factor.copyToDevice();
 }
 
 void
@@ -162,11 +181,22 @@ System::setupDofs()
   std::vector<std::vector<dof_id_type>> send_list(num_procs);
   std::vector<std::vector<dof_id_type>> recv_list(num_procs);
 
-  for (auto dof : _dof_map.get_send_list())
-    recv_list[_dof_map.dof_owner(dof)].push_back(dof);
+  // Tell the owner of each ghost DOF that we need it. This is a sparse exchange with only the
+  // neighboring processes, so its cost does not grow with the total number of processes.
+  {
+    std::map<processor_id_type, std::vector<dof_id_type>> push_data;
 
-  for (processor_id_type proc = 0; proc < num_procs; proc++)
-    _comm.scatter(recv_list, send_list[proc], proc);
+    for (auto dof : _dof_map.get_send_list())
+      push_data[_dof_map.dof_owner(dof)].push_back(dof);
+
+    for (const auto & [proc, dofs] : push_data)
+      recv_list[proc] = dofs;
+
+    auto receive = [&send_list](const processor_id_type pid, std::vector<dof_id_type> && dofs)
+    { send_list[pid] = std::move(dofs); };
+
+    TIMPI::push_parallel_vector_data(_comm, std::move(push_data), receive);
+  }
 
   _local_comm_list.create(num_procs);
   _ghost_comm_list.create(num_procs);
@@ -221,33 +251,39 @@ System::setupSparsity()
 
   auto num_procs = _comm.size();
 
-  std::vector<std::vector<PetscInt>> send_cols(num_procs), send_num_cols(num_procs);
-  std::vector<std::vector<PetscInt>> recv_cols(num_procs), recv_num_cols(num_procs);
+  // Send the sparsity of the rows ghosted by each neighboring process to it, packed as
+  // [n_cols, cols..., n_cols, cols..., ...] in the order of its ghost DOFs. This is a sparse
+  // exchange with only the neighboring processes.
+  std::map<processor_id_type, std::vector<PetscInt>> send_rows;
 
-  for (processor_id_type proc = 0; proc < num_procs; proc++)
+  for (const auto proc : make_range(num_procs))
     for (auto r : _local_comm_list[proc])
     {
-      for (PetscInt c = row_ptr[r]; c < row_ptr[r + 1]; ++c)
-        send_cols[proc].push_back(col_idx[c]);
+      auto & send = send_rows[proc];
 
-      send_num_cols[proc].push_back(row_ptr[r + 1] - row_ptr[r]);
+      send.push_back(row_ptr[r + 1] - row_ptr[r]);
+
+      for (PetscInt c = row_ptr[r]; c < row_ptr[r + 1]; ++c)
+        send.push_back(col_idx[c]);
     }
 
-  for (processor_id_type proc = 0; proc < num_procs; proc++)
-  {
-    _comm.scatter(send_cols, recv_cols[proc], proc);
-    _comm.scatter(send_num_cols, recv_num_cols[proc], proc);
-  }
+  std::vector<std::vector<PetscInt>> recv_rows(num_procs);
 
-  std::vector<PetscInt> col(num_procs), row(num_procs);
+  auto receive = [&recv_rows](const processor_id_type pid, std::vector<PetscInt> && rows)
+  { recv_rows[pid] = std::move(rows); };
+
+  TIMPI::push_parallel_vector_data(_comm, std::move(send_rows), receive);
+
+  std::vector<std::size_t> pos(num_procs);
 
   for (auto r : _dof_map.get_send_list())
   {
     auto proc = _dof_map.dof_owner(r);
-    auto n_cols = recv_num_cols[proc][row[proc]++];
+    auto & rows = recv_rows[proc];
+    auto n_cols = rows[pos[proc]++];
 
     for (PetscInt c = 0; c < n_cols; ++c)
-      col_idx.push_back(recv_cols[proc][col[proc]++]);
+      col_idx.push_back(rows[pos[proc]++]);
 
     row_ptr.push_back(col_idx.size());
   }
@@ -291,6 +327,8 @@ System::sync(const MemcpyType dir)
 {
   if (dir == MemcpyType::HOST_TO_DEVICE)
   {
+    updateVariableScalingFactors();
+
     for (auto tag : _active_solution_tags)
     {
       auto & vector = _system.getVector(tag);

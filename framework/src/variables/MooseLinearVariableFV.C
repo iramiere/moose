@@ -87,7 +87,7 @@ MooseLinearVariableFV<OutputType>::MooseLinearVariableFV(const InputParameters &
   _neighbor_data = std::make_unique<MooseVariableDataLinearFV<OutputType>>(
       *this, _sys, _tid, Moose::ElementType::Neighbor, this->_assembly.neighbor());
 
-  if (libMesh::n_threads() > 1)
+  if (this->getMooseApp().numThreads() > 1)
     mooseError("MooseLinearVariableFV does not support threading at the moment!");
 }
 
@@ -931,6 +931,13 @@ MooseLinearVariableFV<OutputType>::adSln() const
 template <typename OutputType>
 const ADTemplateVariableGradient<OutputType> &
 MooseLinearVariableFV<OutputType>::adGradSln() const
+{
+  adError();
+}
+
+template <typename OutputType>
+const ADTemplateVariableGradient<OutputType> &
+MooseLinearVariableFV<OutputType>::adGradSlnFace() const
 {
   adError();
 }

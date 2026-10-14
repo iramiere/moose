@@ -106,7 +106,7 @@ PorousFlowDarcyBaseTempl<is_ad>::PorousFlowDarcyBaseTempl(const InputParameters 
                "MONOMIAL) cannot be used as a PorousFlow variable.");
 
 #ifdef LIBMESH_HAVE_TBB_API
-  if (libMesh::n_threads() > 1)
+  if (this->_fe_problem.numThreads() > 1)
     mooseWarning("PorousFlowDarcyBase: num_upwinds and num_downwinds may not be computed "
                  "accurately when using TBB and greater than 1 thread");
 #endif
@@ -183,7 +183,7 @@ void
 PorousFlowDarcyBaseTempl<is_ad>::computeResidual()
 {
   if constexpr (!is_ad)
-    computeResidualAndJacobian(JacRes::CALCULATE_RESIDUAL, 0);
+    computeResidualOrJacobian(JacRes::CALCULATE_RESIDUAL, 0);
   else
   {
     adComputeProtoFlux(false);
@@ -213,7 +213,7 @@ void
 PorousFlowDarcyBaseTempl<is_ad>::computeJacobian()
 {
   if constexpr (!is_ad)
-    computeResidualAndJacobian(JacRes::CALCULATE_JACOBIAN, _var.number());
+    computeResidualOrJacobian(JacRes::CALCULATE_JACOBIAN, _var.number());
   else
     // Block-diagonal (e.g. PJFNK) assembly path: this is the only Jacobian call we get.
     adComputeJacobian();
@@ -252,7 +252,7 @@ void
 PorousFlowDarcyBaseTempl<is_ad>::computeOffDiagJacobian(const unsigned int jvar)
 {
   if constexpr (!is_ad)
-    computeResidualAndJacobian(JacRes::CALCULATE_JACOBIAN, jvar);
+    computeResidualOrJacobian(JacRes::CALCULATE_JACOBIAN, jvar);
   else
   {
     libmesh_ignore(jvar);
@@ -277,7 +277,12 @@ PorousFlowDarcyBaseTempl<is_ad>::computeProtoFluxWithoutMobility()
     _proto_flux[ph].assign(num_nodes, 0.0);
     for (_qp = 0; _qp < this->_qrule->n_points(); _qp++)
     {
-      const Real jxw_coord = this->_JxW[_qp] * this->_coord[_qp];
+      // The AD weight carries the displacement derivatives on a displaced mesh. Elsewhere use the
+      // Real weight, as ADKernel does: XFEM rescales only the Real weight.
+      GenericReal<is_ad> jxw_coord = this->_JxW[_qp] * this->_coord[_qp];
+      if constexpr (is_ad)
+        if (this->_use_displaced_mesh)
+          jxw_coord = this->_ad_JxW[_qp] * this->_ad_coord[_qp];
       for (_i = 0; _i < num_nodes; ++_i)
         _proto_flux[ph][_i] += jxw_coord * darcyQp(ph);
     }
@@ -375,7 +380,7 @@ PorousFlowDarcyBaseTempl<is_ad>::adComputeProtoFlux(bool do_counting)
 
 template <bool is_ad>
 void
-PorousFlowDarcyBaseTempl<is_ad>::computeResidualAndJacobian(JacRes res_or_jac, unsigned int jvar)
+PorousFlowDarcyBaseTempl<is_ad>::computeResidualOrJacobian(JacRes res_or_jac, unsigned int jvar)
 {
   if ((res_or_jac == JacRes::CALCULATE_JACOBIAN) && _dictator.notPorousFlowVariable(jvar))
     return;
