@@ -1,6 +1,6 @@
 # This example aims to replicate the test cas "Single-block thermomechanics example" with two ways coupling
 # of the paper 'Evaluation of coupling approaches for thermomechanical simulations'
-# S.R. Novascone∗, B.W. Spencer, J.D. Hales, R.L. Williamson
+# S.R. Novascone, B.W. Spencer, J.D. Hales, R.L. Williamson
 # NED 2015
 
 [Mesh]
@@ -116,8 +116,7 @@
   []
   [thermal_strain]
     type= ComputeThermalExpansionEigenstrain
-    #thermal_expansion_coeff = 1e-5
-    thermal_expansion_coeff = 1e-3
+    thermal_expansion_coeff = 1e-5
     temperature = T
     stress_free_temperature = 100
     eigenstrain_name = thermal_expansion

@@ -265,6 +265,8 @@ DisplacedProblem::updateMesh(bool mesh_changing)
 {
   TIME_SECTION("updateMesh", 3, "Updating Displaced Mesh");
 
+  // std::cout<<"IR : update Mesh"<<std::endl;
+
   // If the mesh is changing, we are probably performing adaptivity. In that case, we do *not* want
   // to use the undisplaced mesh solution because it may be out-of-sync, whereas our displaced mesh
   // solution should be in the correct state after getting restricted/prolonged in

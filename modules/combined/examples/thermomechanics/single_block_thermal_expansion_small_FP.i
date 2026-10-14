@@ -1,6 +1,6 @@
 # This example aims to replicate the test cas "Single-block thermomechanics example" with one way coupling
 # of the paper 'Evaluation of coupling approaches for thermomechanical simulations'
-# S.R. Novascone∗, B.W. Spencer, J.D. Hales, R.L. Williamson
+# S.R. Novascone, B.W. Spencer, J.D. Hales, R.L. Williamson
 # NED 2015
 
 [Mesh]
