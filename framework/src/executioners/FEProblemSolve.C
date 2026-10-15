@@ -555,6 +555,12 @@ FEProblemSolve::solve()
       fp_iter++;
     }
 
+    if (converged)
+    {
+      _problem.execute(EXEC_MULTISYSTEM_FIXED_POINT_END);
+      _problem.outputStep(EXEC_MULTISYSTEM_FIXED_POINT_END);
+    }
+
     if (grid_step != _num_grid_steps)
       _problem.uniformRefine();
   }

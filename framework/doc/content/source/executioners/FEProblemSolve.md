@@ -17,6 +17,8 @@ in the order that they were specified, without iterating between systems.
 If the [!param](/Executioner/Steady/multi_system_fixed_point) parameter is set to true, this solve will be iterated.
 The user must pass a convergence object to the [!param](/Executioner/Steady/multi_system_fixed_point_convergence)
 to let the `FEProblemSolve` know when to terminate the fixed point loop.
+The fixed point loop may be accelerated with a [MultiSystemSecantTransformation.md], which applies a secant
+update or Aitken dynamic relaxation to selected variables at the end of each iteration.
 
 !alert note
 Options are currently limited for setting a multi-system fixed point convergence. We do not recommend using the

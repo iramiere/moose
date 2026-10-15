@@ -25,6 +25,7 @@ The default (and thus most common) flags are listed below:
 `MULTIAPP_FIXED_POINT_END` | At the end of each fixed point solve loop (only if the fixed point solve converged).
 `MULTIAPP_FIXED_POINT_CONVERGENCE` | In each iteration of the MultiApp fixed point loop, immediately prior to the MultiApp fixed point convergence check, after `TIMESTEP_END` and MultiApps/transfers executing on `TIMESTEP_END`.
 `MULTISYSTEM_FIXED_POINT_ITERATION_END` | At the end of each iteration of the multi-system fixed point loop.
+`MULTISYSTEM_FIXED_POINT_END` | At the end of the multi-system fixed point loop (only if the multi-system fixed point solve converged).
 `POST_ADAPTIVITY` | Once all adaptivity steps have been performed on a timestep (after `TIMESTEP_END` and before progressing to the next step). Note that `POST_ADAPTIVITY` is not executed on initial adaptivity, the final timestep, or during multi-app Picard iterations. `POST_ADAPTIVITY` will be executed even if the mesh is not changed by adaptivity, as long as adaptivity is executed.
 `FINAL` | At the end of the entire simulation.
 `CUSTOM` | At user specified instants.

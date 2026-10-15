@@ -17,7 +17,31 @@
       cli_args = 'Outputs/file_base=single_system'
       exodiff = 'single_system.e'
       prereq = 'tests/single_system'
-      detail = 'using the multi-system fixed point solve approach with a custom convergence criteria.'
+      detail = 'using the multi-system fixed point solve approach with a custom convergence criteria,'
     []
+    [multi_system_aitken]
+      type = Exodiff
+      input = multi_system_secant.i
+      # The converged solution is the same as the single-system solution.
+      cli_args = 'Outputs/file_base=single_system'
+      exodiff = 'single_system.e'
+      prereq = 'tests/multi_system'
+      detail = 'using the multi-system fixed point solve approach with Aitken dynamic relaxation of selected variables, and'
+    []
+    [multi_system_secant]
+      type = Exodiff
+      input = multi_system_secant.i
+      cli_args = 'UserObjects/secant/method=per_dof UserObjects/secant/variables=u '
+                 'Outputs/file_base=single_system'
+      exodiff = 'single_system.e'
+      prereq = 'tests/multi_system_aitken'
+      detail = 'using the multi-system fixed point solve approach with a secant transformation of each degree of freedom of selected variables.'
+    []
+  []
+  [execute_on_end]
+    type = CSVDiff
+    input = multi_system_end.i
+    csvdiff = 'multi_system_end_csv.csv'
+    requirement = 'The system shall be able to execute objects at the end of each multi-system fixed point iteration and once at the end of a converged multi-system fixed point solve.'
   []
 []
