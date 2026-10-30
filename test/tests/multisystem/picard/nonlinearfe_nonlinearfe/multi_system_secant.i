@@ -7,6 +7,6 @@
   [secant]
     type = MultiSystemSecantTransformation
     variables = 'v'
-    method = aitken
+    method = AITKEN
   []
 []

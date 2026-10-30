@@ -2945,6 +2945,18 @@ public:
   virtual unsigned int currentLinearSysNum() const override;
 
   /**
+   * Set the number of the solver system that was just solved by the multi-system solve loop, so
+   * that objects executed right after that solve can tell which system it was
+   */
+  void setJustSolvedSolverSys(const unsigned int sys_num) { _just_solved_solver_sys = sys_num; }
+
+  /**
+   * @return the number of the solver system that was just solved by the multi-system solve loop,
+   * or libMesh::invalid_uint if none
+   */
+  unsigned int justSolvedSolverSys() const { return _just_solved_solver_sys; }
+
+  /**
    * @return the nonlinear system number corresponding to the provided \p nl_sys_name
    */
   virtual unsigned int nlSysNum(const NonlinearSystemName & nl_sys_name) const override;
@@ -3234,6 +3246,9 @@ protected:
 
   /// The current solver system
   SolverSystem * _current_solver_sys;
+
+  /// The solver system that was just solved by the multi-system solve loop
+  unsigned int _just_solved_solver_sys = libMesh::invalid_uint;
 
   /// Combined container to base pointer of every solver system
   std::vector<std::shared_ptr<SolverSystem>> _solver_systems;
