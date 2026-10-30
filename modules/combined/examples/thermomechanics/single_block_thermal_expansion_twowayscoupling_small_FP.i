@@ -191,7 +191,7 @@
   [ms_rel_conv]
     type = MultiPostprocessorConvergence
     postprocessors = 'nl_temp_relative nl_disp_relative'
-    tolerances = '1e-6 1e-6'
+    tolerances = '1e-8 1e-8'
     # tolerances = '1e-12 1e-12'
     verbose = true
   []

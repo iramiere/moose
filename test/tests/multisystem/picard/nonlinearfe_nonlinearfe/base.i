@@ -6,7 +6,7 @@
 # The manufactured solutions are:
 #
 #  u(x) = 1 + sin(pi x)
-#  y(x) = 1/2 * (1 + sin(pi x))
+#  v(x) = 1/2 * (1 + sin(pi x))
 
 Du = 1.0
 Dv = 0.1

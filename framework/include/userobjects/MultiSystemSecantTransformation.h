@@ -12,8 +12,14 @@
 #include "GeneralUserObject.h"
 
 /**
- * Applies a secant update to selected variables at the end of each multi-system fixed point
- * iteration, either independently for each degree of freedom or with Aitken's dynamic relaxation.
+ * Applies a secant-type acceleration to selected variables right after the solve of their system
+ * in each multi-system fixed point iteration (execute_on MULTISYSTEM_FIXED_POINT_TRANSFORMATION,
+ * executed by the solve loop after every system solve). With x_k the iterate of the system entering
+ * iteration k, f(x_k) its evaluation and r_k = f(x_k) - x_k the fixed point residual, the available
+ * updates are:
+ *  - per_dof:   independent scalar secant (Steffensen-like) update of each degree of freedom
+ *  - aitken:    x_{k+1} = x_k + w_k r_k with a single scalar w_k for all the degrees of freedom
+ *  - anderson:  Anderson acceleration with depth m = 1 (vector secant, residual minimization)
  */
 class MultiSystemSecantTransformation : public GeneralUserObject
 {
@@ -38,16 +44,29 @@ protected:
   SystemBase & _sys;
   /// Names of the transformed variables
   const std::vector<VariableName> & _var_names;
-  /// Relaxation factor applied to the per-DOF secant update, or initial Aitken relaxation factor
-  const Real _relaxation_factor;
+  /// Relaxation factor w_0 of the first iteration of per_dof and aitken (no secant information yet)
+  const Real _initial_relaxation_factor;
+  /// Mixing parameter beta of the Anderson acceleration, applied at every iteration
+  const Real _anderson_mixing;
+  /// Whether to print the coefficients of the update at each iteration
+  const bool _verbose;
 
-  /// Secant update method
+  /// Acceleration method
   enum class Method
   {
     PER_DOF,
-    AITKEN
+    AITKEN,
+    ANDERSON
   };
   const Method _method;
+
+  /// Formula used to compute the Aitken relaxation factor
+  enum class AitkenFormula
+  {
+    RECURSIVE,
+    CROSSED_SECANT
+  };
+  const AitkenFormula _aitken_formula;
 
   /// Iterate x_{k-1} entering the previous multi-system fixed point iteration
   NumericVector<Number> & _x_prev;

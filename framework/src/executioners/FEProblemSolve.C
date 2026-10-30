@@ -501,6 +501,14 @@ FEProblemSolve::solve()
               sys->applyFixedPointRelaxation(_multi_sys_fp_relax_factors[sys_i],
                                              Moose::SolutionIterationType::MultiSystemFixedPoint);
 
+            // Transformations of the solution of this system (e.g. accelerations) are applied
+            // right after its solve, so that the next systems use the transformed solution
+            if (_using_multi_sys_fp_iterations)
+            {
+              _problem.setJustSolvedSolverSys(sys->number());
+              _problem.execute(EXEC_MULTISYSTEM_FIXED_POINT_TRANSFORMATION);
+            }
+
             // Store the accepted, possibly relaxed LinearFV solution for nonlinear lagging.
             if (!is_nonlinear)
               sys->copyPreviousSolutions(Moose::SolutionIterationType::Nonlinear);
