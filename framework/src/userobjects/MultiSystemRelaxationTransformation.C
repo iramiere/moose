@@ -25,14 +25,19 @@ MultiSystemRelaxationTransformation::validParams()
       "in each multi-system fixed point iteration.");
   params.addRequiredParam<std::vector<VariableName>>(
       "variables", "Solver variables to relax. They must all belong to the same solver system.");
-  params.addRequiredRangeCheckedParam<Real>(
+  params.addRequiredParam<Real>(
       "relaxation_factor",
-      "relaxation_factor>0 & relaxation_factor<2",
       "Relaxation factor w applied to the update, x + w (f(x) - x); 1 means no relaxation.");
+  params.addParam<unsigned int>(
+      "start_iteration",
+      0,
+      "Index of the first multi-system fixed point iteration (counted from 0 in each time step) "
+      "at which the relaxation is applied. Earlier iterations are plain Picard updates.");
 
-  // The relaxation is applied right after the solve of the system holding the variables
+  // The relaxation is applied right after the solve of the system holding the variables, and the
+  // iteration count is reset at the end of the loop
   ExecFlagEnum & exec_enum = params.set<ExecFlagEnum>("execute_on", true);
-  exec_enum = {EXEC_MULTISYSTEM_FIXED_POINT_TRANSFORMATION};
+  exec_enum = {EXEC_MULTISYSTEM_FIXED_POINT_TRANSFORMATION, EXEC_MULTISYSTEM_FIXED_POINT_END};
   params.suppressParameter<ExecFlagEnum>("execute_on");
   return params;
 }
@@ -42,7 +47,9 @@ MultiSystemRelaxationTransformation::MultiSystemRelaxationTransformation(
   : GeneralUserObject(parameters),
     _sys(_fe_problem.getVariable(0, getParam<std::vector<VariableName>>("variables")[0]).sys()),
     _var_names(getParam<std::vector<VariableName>>("variables")),
-    _relaxation_factor(getParam<Real>("relaxation_factor"))
+    _relaxation_factor(getParam<Real>("relaxation_factor")),
+    _start_iteration(getParam<unsigned int>("start_iteration")),
+    _num_its(0)
 {
   for (const auto & var_name : _var_names)
     if (!_fe_problem.hasSolverVariable(var_name))
@@ -61,8 +68,17 @@ MultiSystemRelaxationTransformation::initialSetup()
 }
 
 void
+MultiSystemRelaxationTransformation::timestepSetup()
+{
+  // A failed solve does not reach MULTISYSTEM_FIXED_POINT_END, so the count must also be reset
+  // before a (possibly repeated) time step
+  _num_its = 0;
+}
+
+void
 MultiSystemRelaxationTransformation::meshChanged()
 {
+  _num_its = 0;
   gatherDofs();
 }
 
@@ -80,8 +96,18 @@ MultiSystemRelaxationTransformation::gatherDofs()
 void
 MultiSystemRelaxationTransformation::execute()
 {
+  if (_fe_problem.getCurrentExecuteOnFlag() == EXEC_MULTISYSTEM_FIXED_POINT_END)
+  {
+    _num_its = 0;
+    return;
+  }
+
   // The flag is executed after the solve of every system: only act after the solve of ours
   if (_fe_problem.justSolvedSolverSys() != _sys.number())
+    return;
+
+  // Plain Picard update, f(x_k) is kept as is, until the start iteration is reached
+  if (_num_its++ < _start_iteration)
     return;
 
   auto & solution = _sys.solution();
