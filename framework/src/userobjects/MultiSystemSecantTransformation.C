@@ -31,17 +31,19 @@ MultiSystemSecantTransformation::validParams()
       "system in each multi-system fixed point iteration.");
   params.addRequiredParam<std::vector<VariableName>>(
       "variables", "Solver variables to transform. They must all belong to the same solver system.");
-  params.addRangeCheckedParam<Real>(
+  params.addParam<Real>(
       "initial_relaxation_factor",
       1.0,
-      "initial_relaxation_factor>0 & initial_relaxation_factor<2",
       "Relaxation factor w_0 of the first iteration, x + w_0 (f(x) - x), when no secant "
       "information is available yet. Only used with 'per_dof' and 'aitken'; Anderson uses "
       "'anderson_mixing' instead");
+  // The mixing (damping) parameter of Anderson acceleration is taken in (0, 1], 1 being the
+  // undamped update (Walker and Ni, SIAM J. Numer. Anal. 49(4), 2011; Evans et al., SIAM J.
+  // Numer. Anal. 58(1), 2020)
   params.addRangeCheckedParam<Real>(
       "anderson_mixing",
       1.0,
-      "anderson_mixing>0 & anderson_mixing<2",
+      "anderson_mixing>0 & anderson_mixing<=1",
       "Mixing parameter beta of the Anderson acceleration, applied at every iteration "
       "including the first one (only used with method = anderson)");
   MooseEnum method("per_dof aitken anderson", "per_dof");

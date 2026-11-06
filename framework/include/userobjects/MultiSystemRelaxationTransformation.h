@@ -16,7 +16,8 @@
  * multi-system fixed point iteration (execute_on MULTISYSTEM_FIXED_POINT_TRANSFORMATION, executed
  * by the solve loop after every system solve):
  * x_{k+1} = x_k + w (f(x_k) - x_k), with x_k the iterate entering iteration k and f(x_k) its
- * evaluation.
+ * evaluation. The relaxation starts at the multi-system fixed point iteration 'start_iteration'
+ * of each time step; earlier iterations are plain Picard updates x_{k+1} = f(x_k).
  */
 class MultiSystemRelaxationTransformation : public GeneralUserObject
 {
@@ -26,6 +27,7 @@ public:
   MultiSystemRelaxationTransformation(const InputParameters & parameters);
 
   virtual void initialSetup() override;
+  virtual void timestepSetup() override;
   virtual void meshChanged() override;
 
   virtual void initialize() override {}
@@ -42,6 +44,10 @@ protected:
   const std::vector<VariableName> & _var_names;
   /// Relaxation factor w
   const Real _relaxation_factor;
+  /// Index of the first multi-system fixed point iteration at which the relaxation is applied
+  const unsigned int _start_iteration;
+  /// Number of multi-system fixed point iterations performed since the last reset
+  unsigned int _num_its;
 
   /// Local degrees of freedom of the transformed variables
   std::vector<dof_id_type> _dofs;
