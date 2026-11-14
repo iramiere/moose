@@ -159,23 +159,32 @@ FEProblemSolve::validParams()
                                      "Whether to compute the residual and Jacobian together. "
                                      "Vector entries correspond to each nonlinear system.");
 
-  params.addParam<bool>("reuse_preconditioner",
-                        false,
-                        "If true reuse the previously calculated "
-                        "preconditioner for the linearized "
-                        "system across multiple solves "
-                        "spanning nonlinear iterations and time steps. "
-                        "The preconditioner resets as controlled by "
-                        "reuse_preconditioner_max_linear_its");
-  params.addParam<unsigned int>("reuse_preconditioner_max_linear_its",
-                                25,
-                                "Reuse the previously calculated "
-                                "preconditioner for the linear system "
-                                "until the number of linear iterations "
-                                "exceeds this number");
+  params.addParam<std::vector<bool>>("reuse_preconditioner",
+                                     {false},
+                                     "If true reuse the previously calculated "
+                                     "preconditioner for the linearized "
+                                     "system across multiple solves "
+                                     "spanning nonlinear iterations and time steps. "
+                                     "The preconditioner resets as controlled by "
+                                     "reuse_preconditioner_max_linear_its. "
+                                     "Vector entries correspond to each nonlinear system.");
+  params.addParam<std::vector<bool>>(
+      "reuse_jacobian",
+      {false},
+      "Whether to compute the Jacobian once per time step and reuse it in the following solves of "
+      "the time step (e.g. in subsequent multi-system fixed point iterations). Requires "
+      "'reuse_preconditioner = true' for the same system, which keeps its solver between solves. "
+      "Vector entries correspond to each nonlinear system.");
+  params.addParam<std::vector<unsigned int>>("reuse_preconditioner_max_linear_its",
+                                             {25},
+                                             "Reuse the previously calculated "
+                                             "preconditioner for the linear system "
+                                             "until the number of linear iterations "
+                                             "exceeds this number. Vector entries correspond to "
+                                             "each nonlinear system.");
 
   params.addParamNamesToGroup("l_tol l_abs_tol l_max_its reuse_preconditioner "
-                              "reuse_preconditioner_max_linear_its",
+                              "reuse_preconditioner_max_linear_its reuse_jacobian",
                               "Linear Solver");
   params.addParamNamesToGroup(
       "solve_type snesmf_reuse_base use_pre_SMO_residual "
@@ -226,9 +235,7 @@ FEProblemSolve::FEProblemSolve(Executioner & ex)
   es.parameters.set<Real>("linear solver absolute tolerance") = getParam<Real>("l_abs_tol");
   es.parameters.set<unsigned int>("linear solver maximum iterations") =
       getParam<unsigned int>("l_max_its");
-  es.parameters.set<bool>("reuse preconditioner") = getParam<bool>("reuse_preconditioner");
-  es.parameters.set<unsigned int>("reuse preconditioner maximum linear iterations") =
-      getParam<unsigned int>("reuse_preconditioner_max_linear_its");
+  // The preconditioner reuse parameters are set per nonlinear system below
 
   // Transfer to the Problem misc nonlinear solve optimization parameters
   _problem.setSNESMFReuseBase(getParam<bool>("snesmf_reuse_base"),
@@ -303,6 +310,27 @@ FEProblemSolve::FEProblemSolve(Executioner & ex)
     i_nl_sys++;
 
     nl.setPreSMOResidual(getParam<bool>("use_pre_SMO_residual"));
+
+    // Preconditioner reuse, set in the parameters of the libMesh system, which take precedence
+    // over the EquationSystems ones. libMesh reads these system parameters as unsigned int.
+    const auto reuse_preconditioner =
+        getParamFromNonlinearSystemVectorParam<bool>("reuse_preconditioner", i_nl_sys);
+    auto & sys_params = nl.system().parameters;
+    sys_params.set<unsigned int>("reuse preconditioner") = reuse_preconditioner;
+    sys_params.set<unsigned int>("reuse preconditioner maximum linear iterations") =
+        getParamFromNonlinearSystemVectorParam<unsigned int>("reuse_preconditioner_max_linear_its",
+                                                             i_nl_sys);
+
+    const auto reuse_jacobian =
+        getParamFromNonlinearSystemVectorParam<bool>("reuse_jacobian", i_nl_sys);
+    // libMesh only keeps the SNES, and thus the Jacobian lag, between solves when the
+    // preconditioner is reused
+    if (reuse_jacobian && !reuse_preconditioner)
+      paramError("reuse_jacobian",
+                 "Reusing the Jacobian of nonlinear system '",
+                 nl.name(),
+                 "' requires 'reuse_preconditioner = true' for this system.");
+    nl.reuseJacobian(reuse_jacobian);
 
     const auto res_and_jac =
         getParamFromNonlinearSystemVectorParam<bool>("residual_and_jacobian_together", i_nl_sys);

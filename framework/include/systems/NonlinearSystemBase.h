@@ -744,6 +744,9 @@ public:
     _ignore_variables_for_autoscaling = ignore_variables_for_autoscaling;
   }
 
+  /// Set whether the Jacobian is computed once per time step and reused in the following solves
+  void reuseJacobian(bool reuse_jacobian) { _reuse_jacobian = reuse_jacobian; }
+
   bool offDiagonalsInAutoScaling() const { return _off_diagonals_in_auto_scaling; }
   void offDiagonalsInAutoScaling(bool off_diagonals_in_auto_scaling)
   {
@@ -1078,6 +1081,11 @@ protected:
 
   /// Whether to include off diagonals when determining automatic scaling factors
   bool _off_diagonals_in_auto_scaling;
+
+  /// Whether the Jacobian is computed once per time step and reused in the following solves
+  bool _reuse_jacobian;
+  /// Whether the Jacobian must be recomputed at the next solve when it is reused
+  bool _recompute_reused_jacobian;
 
   /// A diagonal matrix used for computing scaling
   std::unique_ptr<libMesh::DiagonalMatrix<Number>> _scaling_matrix;

@@ -39,6 +39,18 @@
       exodiff = 'two_way_out.e'
       detail = 'using the a multi-system approach with fixed point iterations using a Picard algorithm,'
     []
+    [necessary_picard_reuse_jacobian]
+      type = Exodiff
+      input = two_way.i
+      # At fixed v, the u equation is linear with a constant Jacobian, so reusing it across
+      # fixed point iterations gives the same solution. The PETSc information output shows that the
+      # u Jacobian is reused.
+      cli_args = "Problem/nl_sys_names='u_sys v_sys' Variables/u/solver_sys=u_sys Variables/v/solver_sys=v_sys Executioner/multi_system_fixed_point=true Executioner/multi_system_fixed_point_convergence=multisys Executioner/solve_type=NEWTON Executioner/reuse_preconditioner='true true' Executioner/reuse_jacobian='true false' -info :snes"
+      exodiff = 'two_way_out.e'
+      expect_out = 'Reusing Jacobian/preconditioner because lag is -1'
+      issues = '#33987'
+      detail = 'using the a multi-system approach with fixed point iterations using a Picard algorithm, reusing the Jacobian and preconditioner of one of the systems across fixed point iterations,'
+    []
     [necessary_picard_solved_in_other_order]
       type = Exodiff
       input = two_way.i
@@ -69,6 +81,17 @@
                   Executioner/multi_system_fixed_point=true Executioner/multi_system_fixed_point_convergence=multisys"
       detail = 'an empty vector parameter has been specified with multiple systems at hand,'
       expect_err = 'This parameter was passed to a routine which cannot handle empty vector parameters'
+    []
+    [reuse_jacobian_without_reuse_preconditioner]
+      type = RunException
+      input = 'two_way.i'
+      cli_args = "Problem/nl_sys_names='u_sys v_sys'
+                  Variables/u/solver_sys=u_sys Variables/v/solver_sys=v_sys
+                  Executioner/multi_system_fixed_point=true Executioner/multi_system_fixed_point_convergence=multisys
+                  Executioner/reuse_preconditioner='false true' Executioner/reuse_jacobian='true false'"
+      issues = '#33987'
+      detail = 'the Jacobian of a system is reused without reusing its preconditioner,'
+      expect_err = "Reusing the Jacobian of nonlinear system 'u_sys' requires 'reuse_preconditioner = true' for this system"
     []
     [missing_fp_cv]
       type = RunException
