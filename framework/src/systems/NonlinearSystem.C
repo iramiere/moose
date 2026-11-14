@@ -168,6 +168,18 @@ NonlinearSystem::solve()
 
   potentiallySetupFiniteDifferencing();
 
+  // The lag is set in code rather than through '-snes_lag_jacobian', because libMesh calls
+  // SNESSetFromOptions at every solve, which would reset an option-provided lag of -2.
+  // A lag of -2 computes the Jacobian at the next Newton iteration and then switches to -1, which
+  // reuses it in the following solves since the lag persists across SNESSolve calls.
+  if (_reuse_jacobian && _recompute_reused_jacobian)
+  {
+    SNES snes = getSNES();
+    LibmeshPetscCall(SNESSetLagJacobianPersists(snes, PETSC_TRUE));
+    LibmeshPetscCall(SNESSetLagJacobian(snes, -2));
+    _recompute_reused_jacobian = false;
+  }
+
   const bool time_integrator_solve = std::any_of(_time_integrators.begin(),
                                                  _time_integrators.end(),
                                                  [](auto & ti) { return ti->overridesSolve(); });

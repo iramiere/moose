@@ -199,6 +199,8 @@ NonlinearSystemBase::NonlinearSystemBase(FEProblemBase & fe_problem,
     _compute_scaling_once(true),
     _resid_vs_jac_scaling_param(0),
     _off_diagonals_in_auto_scaling(false),
+    _reuse_jacobian(false),
+    _recompute_reused_jacobian(true),
     _auto_scaling_initd(false)
 {
   getResidualNonTimeVector();
@@ -369,6 +371,9 @@ void
 NonlinearSystemBase::timestepSetup()
 {
   SolverSystem::timestepSetup();
+
+  // A reused Jacobian is recomputed once per time step
+  _recompute_reused_jacobian = true;
 
   for (THREAD_ID tid = 0; tid < this->numThreads(); tid++)
   {
